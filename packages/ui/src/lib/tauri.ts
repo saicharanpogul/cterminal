@@ -58,3 +58,16 @@ export function onPtyExit(
 ): Promise<UnlistenFn> {
   return listen<PtyExitEvent>("pty:exit", (event) => callback(event.payload));
 }
+
+// Claude Code detection
+export interface ClaudeStatusResult {
+  is_running: boolean;
+  pid: number | null;
+  version: string | null;
+}
+
+export async function getClaudeStatus(
+  sessionId: string,
+): Promise<ClaudeStatusResult> {
+  return invoke<ClaudeStatusResult>("claude_status", { sessionId });
+}

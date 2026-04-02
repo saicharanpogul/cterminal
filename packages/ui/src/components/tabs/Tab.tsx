@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import clsx from "clsx";
+import { useClaudeStore } from "@/hooks/useClaudeDetection";
 
 interface TabProps {
   tab: {
@@ -16,6 +17,8 @@ interface TabProps {
 }
 
 export function Tab({ tab, index, isActive, onClick, onClose, showClose }: TabProps) {
+  const isClaudeRunning = useClaudeStore((s) => s.isClaudeRunning(tab.sessionId));
+
   return (
     <div
       onClick={onClick}
@@ -24,13 +27,18 @@ export function Tab({ tab, index, isActive, onClick, onClose, showClose }: TabPr
         isActive
           ? "bg-surface-0 text-text-primary"
           : "bg-surface-1 text-text-secondary hover:bg-surface-2",
+        isClaudeRunning && "border-b-2 border-b-accent",
       )}
     >
-      <span className="text-[10px] text-text-muted font-medium tabular-nums">
-        {index}
-      </span>
+      {isClaudeRunning ? (
+        <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse shrink-0" />
+      ) : (
+        <span className="text-[10px] text-text-muted font-medium tabular-nums">
+          {index}
+        </span>
+      )}
       <span className="flex-1 truncate text-xs">
-        {tab.title}
+        {isClaudeRunning ? "Claude" : tab.title}
         {!tab.isAlive && (
           <span className="text-text-muted ml-1">(exited)</span>
         )}

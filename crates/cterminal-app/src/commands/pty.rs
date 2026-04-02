@@ -1,4 +1,5 @@
 use crate::AppState;
+use cterminal_core::claude::ClaudeStatus;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
@@ -87,4 +88,9 @@ pub fn pty_kill(state: State<AppState>, session_id: String) -> Result<(), String
         .session_manager
         .kill(&session_id)
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn claude_status(state: State<AppState>, session_id: String) -> ClaudeStatus {
+    state.session_manager.get_claude_status(&session_id)
 }

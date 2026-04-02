@@ -26,6 +26,8 @@ pub enum PtyError {
 pub struct PtySession {
     master: Arc<Mutex<Box<dyn MasterPty + Send>>>,
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
+    /// PID of the shell process running in this PTY
+    child_pid: Option<u32>,
 }
 
 impl PtySession {
@@ -72,6 +74,9 @@ impl PtySession {
             .spawn_command(cmd)
             .map_err(|e| PtyError::SpawnFailed(e.to_string()))?;
 
+        // Get the child PID before we move the child into the exit thread
+        let child_pid = child.process_id();
+
         // Drop slave side - we only need master
         drop(pair.slave);
 
@@ -96,7 +101,6 @@ impl PtySession {
             loop {
                 match reader.read(&mut buf) {
                     Ok(0) => {
-                        // EOF - flush remaining
                         if !batch.is_empty() {
                             on_data(batch.clone());
                             batch.clear();
@@ -138,7 +142,15 @@ impl PtySession {
             on_exit(code);
         });
 
-        Ok(Self { master, writer })
+        Ok(Self {
+            master,
+            writer,
+            child_pid,
+        })
+    }
+
+    pub fn child_pid(&self) -> Option<u32> {
+        self.child_pid
     }
 
     pub fn write(&self, data: &[u8]) -> Result<(), PtyError> {

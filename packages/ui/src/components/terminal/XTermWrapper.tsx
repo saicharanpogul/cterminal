@@ -14,6 +14,7 @@ import {
 } from "@/lib/tauri";
 import { useConfigStore } from "@/stores/configStore";
 import { usePaneStore } from "@/stores/paneStore";
+import { useClaudeDetection } from "@/hooks/useClaudeDetection";
 
 const THEME = {
   background: "#0d0d0f",
@@ -181,11 +182,24 @@ export function XTermWrapper({ sessionId, isActive }: XTermWrapperProps) {
     };
   }, [sessionId]);
 
+  const { isClaudeRunning } = useClaudeDetection(sessionId);
+
   return (
-    <div
-      ref={containerRef}
-      className="w-full h-full"
-      style={{ padding: "4px 8px" }}
-    />
+    <div className="w-full h-full relative">
+      <div
+        ref={containerRef}
+        className="w-full h-full"
+        style={{ padding: "4px 8px" }}
+      />
+      {/* Claude Code active indicator */}
+      {isClaudeRunning && (
+        <div className="absolute bottom-2 right-3 flex items-center gap-1.5 px-2 py-1 bg-surface-2/90 backdrop-blur-sm rounded-md border border-accent/20">
+          <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+          <span className="text-[10px] text-accent font-medium tracking-wide">
+            Claude
+          </span>
+        </div>
+      )}
+    </div>
   );
 }

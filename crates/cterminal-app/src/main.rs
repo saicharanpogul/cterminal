@@ -31,6 +31,7 @@ fn main() {
             commands::pty::pty_write,
             commands::pty::pty_resize,
             commands::pty::pty_kill,
+            commands::pty::claude_status,
         ])
         .setup(|app| {
             // Set the window to show after it's ready (prevents flash)
