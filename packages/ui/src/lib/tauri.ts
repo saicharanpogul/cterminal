@@ -59,6 +59,26 @@ export function onPtyExit(
   return listen<PtyExitEvent>("pty:exit", (event) => callback(event.payload));
 }
 
+// Inline images
+export interface InlineImageData {
+  protocol: "kitty" | "iterm2" | "sixel";
+  data: number[];
+  width: number | null;
+  height: number | null;
+  mime_type: string | null;
+}
+
+export interface PtyImageEvent {
+  session_id: string;
+  image: InlineImageData;
+}
+
+export function onPtyImage(
+  callback: (event: PtyImageEvent) => void,
+): Promise<UnlistenFn> {
+  return listen<PtyImageEvent>("pty:image", (event) => callback(event.payload));
+}
+
 // Claude Code detection
 export interface ClaudeStatusResult {
   is_running: boolean;

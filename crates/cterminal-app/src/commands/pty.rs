@@ -1,5 +1,6 @@
 use crate::AppState;
 use cterminal_core::claude::ClaudeStatus;
+use cterminal_core::image::{self, InlineImage};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
@@ -13,6 +14,12 @@ struct PtyDataEvent {
 struct PtyExitEvent {
     session_id: String,
     code: Option<u32>,
+}
+
+#[derive(Clone, Serialize)]
+struct PtyImageEvent {
+    session_id: String,
+    image: InlineImage,
 }
 
 #[tauri::command]
@@ -37,13 +44,30 @@ pub fn pty_spawn(
             rows,
             shell,
             move |data| {
-                let _ = data_app.emit(
-                    "pty:data",
-                    PtyDataEvent {
-                        session_id: data_session_id.clone(),
-                        data,
-                    },
-                );
+                // Scan for inline image escape sequences
+                let (clean_data, images) = image::extract_images(&data);
+
+                // Emit image events
+                for img in images {
+                    let _ = data_app.emit(
+                        "pty:image",
+                        PtyImageEvent {
+                            session_id: data_session_id.clone(),
+                            image: img,
+                        },
+                    );
+                }
+
+                // Emit clean terminal data (with image sequences stripped)
+                if !clean_data.is_empty() {
+                    let _ = data_app.emit(
+                        "pty:data",
+                        PtyDataEvent {
+                            session_id: data_session_id.clone(),
+                            data: clean_data,
+                        },
+                    );
+                }
             },
             move |code| {
                 let _ = exit_app.emit(
