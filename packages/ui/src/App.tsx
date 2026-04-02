@@ -1,6 +1,7 @@
 import { Titlebar } from "./components/titlebar/Titlebar";
 import { TabBar } from "./components/tabs/TabBar";
 import { PaneLayout } from "./components/panes/PaneLayout";
+import { ClaudeStatusBar } from "./components/terminal/ClaudeStatusBar";
 import { usePaneStore } from "./stores/paneStore";
 import { useEffect } from "react";
 import { ptyKill } from "./lib/tauri";
@@ -71,6 +72,7 @@ function App() {
       <Titlebar />
       <TabBar />
       <PaneLayout />
+      <ClaudeStatusBar />
     </div>
   );
 }
