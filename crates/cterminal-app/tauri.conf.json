@@ -13,15 +13,19 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "label": "main",
         "title": "cterminal",
         "width": 1200,
         "height": 800,
         "minWidth": 600,
         "minHeight": 400,
         "decorations": false,
+        "hiddenTitle": true,
+        "titleBarStyle": "Overlay",
         "transparent": false,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "visible": false
       }
     ],
     "security": {

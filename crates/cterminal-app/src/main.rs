@@ -5,6 +5,8 @@ mod events;
 
 use cterminal_core::session::SessionManager;
 use std::sync::Arc;
+use tauri::Manager;
+
 pub struct AppState {
     pub session_manager: Arc<SessionManager>,
 }
@@ -30,6 +32,13 @@ fn main() {
             commands::pty::pty_resize,
             commands::pty::pty_kill,
         ])
+        .setup(|app| {
+            // Set the window to show after it's ready (prevents flash)
+            let window = app.get_webview_window("main").unwrap();
+            window.show().unwrap();
+            tracing::info!("cterminal window ready");
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running cterminal");
 }
