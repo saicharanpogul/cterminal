@@ -106,9 +106,14 @@ export function XTermWrapper({ sessionId, isActive }: XTermWrapperProps) {
 
     // Try WebGL, fallback to canvas
     try {
-      terminal.loadAddon(new WebglAddon());
-    } catch {
-      console.warn("WebGL addon failed to load, using canvas renderer");
+      const webglAddon = new WebglAddon();
+      webglAddon.onContextLoss(() => {
+        console.warn("WebGL context lost, falling back to canvas");
+        webglAddon.dispose();
+      });
+      terminal.loadAddon(webglAddon);
+    } catch (e) {
+      console.warn("WebGL addon failed to load, using canvas renderer:", e);
     }
 
     fitAddon.fit();
