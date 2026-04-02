@@ -5,7 +5,13 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import "@xterm/xterm/css/xterm.css";
-import { ptySpawn, ptyWrite, ptyResize, onPtyData, onPtyExit } from "@/lib/tauri";
+import {
+  ptySpawn,
+  ptyWrite,
+  ptyResize,
+  onPtyData,
+  onPtyExit,
+} from "@/lib/tauri";
 import { useConfigStore } from "@/stores/configStore";
 import { useTabStore } from "@/stores/tabStore";
 
@@ -34,23 +40,39 @@ const THEME = {
   brightWhite: "#ffffff",
 };
 
+// Track which sessions have already been spawned globally
+// to prevent double-spawn from React StrictMode
+const spawnedSessions = new Set<string>();
+
 interface XTermWrapperProps {
   sessionId: string;
+  isActive: boolean;
 }
 
-export function XTermWrapper({ sessionId }: XTermWrapperProps) {
+export function XTermWrapper({ sessionId, isActive }: XTermWrapperProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
-  const spawnedRef = useRef(false);
   const config = useConfigStore();
+
+  // Focus terminal when it becomes active
+  useEffect(() => {
+    if (isActive && terminalRef.current) {
+      terminalRef.current.focus();
+      fitAddonRef.current?.fit();
+    }
+  }, [isActive]);
 
   const handleResize = useCallback(() => {
     const fitAddon = fitAddonRef.current;
     const terminal = terminalRef.current;
     if (fitAddon && terminal) {
-      fitAddon.fit();
-      ptyResize(sessionId, terminal.cols, terminal.rows).catch(() => {});
+      try {
+        fitAddon.fit();
+        ptyResize(sessionId, terminal.cols, terminal.rows).catch(() => {});
+      } catch {
+        // Terminal may be disposed during resize
+      }
     }
   }, [sessionId]);
 
@@ -92,21 +114,24 @@ export function XTermWrapper({ sessionId }: XTermWrapperProps) {
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
 
-    // Spawn PTY
-    if (!spawnedRef.current) {
-      spawnedRef.current = true;
+    // Spawn PTY only once per session ID (survives StrictMode remount)
+    if (!spawnedSessions.has(sessionId)) {
+      spawnedSessions.add(sessionId);
       ptySpawn(sessionId, terminal.cols, terminal.rows).catch((err) => {
-        terminal.writeln(`\r\n\x1b[31mFailed to spawn shell: ${err}\x1b[0m`);
+        terminal.writeln(
+          `\r\n\x1b[31mFailed to spawn shell: ${err}\x1b[0m`,
+        );
+        spawnedSessions.delete(sessionId);
       });
     }
 
-    // Wire terminal input → PTY
+    // Wire terminal input -> PTY
     const onDataDisposable = terminal.onData((data) => {
       const encoder = new TextEncoder();
       ptyWrite(sessionId, encoder.encode(data)).catch(() => {});
     });
 
-    // Wire terminal binary input (for mouse etc)
+    // Wire terminal binary input (for mouse, etc)
     const onBinaryDisposable = terminal.onBinary((data) => {
       const bytes = new Uint8Array(data.length);
       for (let i = 0; i < data.length; i++) {
@@ -115,7 +140,7 @@ export function XTermWrapper({ sessionId }: XTermWrapperProps) {
       ptyWrite(sessionId, bytes).catch(() => {});
     });
 
-    // Listen for PTY output → terminal
+    // Listen for PTY output -> terminal
     let unlistenData: (() => void) | null = null;
     let unlistenExit: (() => void) | null = null;
 

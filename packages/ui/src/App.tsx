@@ -2,13 +2,15 @@ import { Titlebar } from "./components/titlebar/Titlebar";
 import { TabBar } from "./components/tabs/TabBar";
 import { XTermWrapper } from "./components/terminal/XTermWrapper";
 import { useTabStore } from "./stores/tabStore";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 function App() {
   const { tabs, activeTabId, createTab } = useTabStore();
+  const initializedRef = useRef(false);
 
   useEffect(() => {
-    if (tabs.length === 0) {
+    if (!initializedRef.current && tabs.length === 0) {
+      initializedRef.current = true;
       createTab();
     }
   }, []);
@@ -25,12 +27,16 @@ function App() {
             key={tab.id}
             className={`absolute inset-0 ${tab.id === activeTabId ? "block" : "hidden"}`}
           >
-            <XTermWrapper sessionId={tab.sessionId} />
+            <XTermWrapper sessionId={tab.sessionId} isActive={tab.id === activeTabId} />
           </div>
         ))}
         {!activeTab && (
-          <div className="flex items-center justify-center h-full text-text-muted">
-            No terminal open. Press Cmd+T to create one.
+          <div className="flex items-center justify-center h-full text-text-muted font-mono text-sm">
+            No terminal open. Press{" "}
+            <kbd className="mx-1 px-1.5 py-0.5 bg-surface-3 rounded text-text-secondary text-xs">
+              Cmd+T
+            </kbd>{" "}
+            to create one.
           </div>
         )}
       </div>
