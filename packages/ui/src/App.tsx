@@ -1,45 +1,76 @@
 import { Titlebar } from "./components/titlebar/Titlebar";
 import { TabBar } from "./components/tabs/TabBar";
-import { XTermWrapper } from "./components/terminal/XTermWrapper";
-import { useTabStore } from "./stores/tabStore";
-import { useEffect, useRef } from "react";
+import { PaneLayout } from "./components/panes/PaneLayout";
+import { usePaneStore } from "./stores/paneStore";
+import { useEffect } from "react";
+import { ptyKill } from "./lib/tauri";
 
 function App() {
-  const { tabs, activeTabId, createTab } = useTabStore();
-  const initializedRef = useRef(false);
+  const {
+    splitPane,
+    closePane,
+    activePaneId,
+    navigatePane,
+    getAllLeaves,
+  } = usePaneStore();
 
+  // Global keyboard shortcuts
   useEffect(() => {
-    if (!initializedRef.current && tabs.length === 0) {
-      initializedRef.current = true;
-      createTab();
-    }
-  }, []);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMeta = e.metaKey || e.ctrlKey;
 
-  const activeTab = tabs.find((t) => t.id === activeTabId);
+      // Split vertical: Cmd+D
+      if (isMeta && e.key === "d" && !e.shiftKey) {
+        e.preventDefault();
+        splitPane(activePaneId, "vertical");
+      }
+
+      // Split horizontal: Cmd+Shift+D
+      if (isMeta && e.shiftKey && e.key === "D") {
+        e.preventDefault();
+        splitPane(activePaneId, "horizontal");
+      }
+
+      // Close pane: Cmd+W
+      if (isMeta && e.key === "w") {
+        e.preventDefault();
+        const leaves = getAllLeaves();
+        const activeLeaf = leaves.find((l) => l.id === activePaneId);
+        if (activeLeaf) {
+          ptyKill(activeLeaf.sessionId).catch(() => {});
+        }
+        if (leaves.length > 1) {
+          closePane(activePaneId);
+        }
+      }
+
+      // Navigate panes: Cmd+Alt+Arrow
+      if (isMeta && e.altKey) {
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          navigatePane("left");
+        } else if (e.key === "ArrowRight") {
+          e.preventDefault();
+          navigatePane("right");
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          navigatePane("up");
+        } else if (e.key === "ArrowDown") {
+          e.preventDefault();
+          navigatePane("down");
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activePaneId, splitPane, closePane, navigatePane, getAllLeaves]);
 
   return (
     <div className="flex flex-col h-screen bg-surface-0">
       <Titlebar />
       <TabBar />
-      <div className="flex-1 relative overflow-hidden">
-        {tabs.map((tab) => (
-          <div
-            key={tab.id}
-            className={`absolute inset-0 ${tab.id === activeTabId ? "block" : "hidden"}`}
-          >
-            <XTermWrapper sessionId={tab.sessionId} isActive={tab.id === activeTabId} />
-          </div>
-        ))}
-        {!activeTab && (
-          <div className="flex items-center justify-center h-full text-text-muted font-mono text-sm">
-            No terminal open. Press{" "}
-            <kbd className="mx-1 px-1.5 py-0.5 bg-surface-3 rounded text-text-secondary text-xs">
-              Cmd+T
-            </kbd>{" "}
-            to create one.
-          </div>
-        )}
-      </div>
+      <PaneLayout />
     </div>
   );
 }

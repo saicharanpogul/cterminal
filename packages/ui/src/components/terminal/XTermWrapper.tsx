@@ -13,7 +13,7 @@ import {
   onPtyExit,
 } from "@/lib/tauri";
 import { useConfigStore } from "@/stores/configStore";
-import { useTabStore } from "@/stores/tabStore";
+import { usePaneStore } from "@/stores/paneStore";
 
 const THEME = {
   background: "#0d0d0f",
@@ -157,7 +157,7 @@ export function XTermWrapper({ sessionId, isActive }: XTermWrapperProps) {
         terminal.writeln(
           `\r\n\x1b[90m[Process exited with code ${event.code ?? "unknown"}]\x1b[0m`,
         );
-        useTabStore.getState().setTabDead(sessionId);
+        usePaneStore.getState().setPaneDead(sessionId);
       }
     }).then((fn) => {
       unlistenExit = fn;
