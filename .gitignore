@@ -1,0 +1,24 @@
+# Rust
+target/
+Cargo.lock
+
+# Node
+node_modules/
+packages/ui/dist/
+
+# Tauri
+crates/cterminal-app/gen/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local

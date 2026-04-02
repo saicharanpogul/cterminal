@@ -1,0 +1,17 @@
+[package]
+name = "cterminal-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Core terminal library for cterminal"
+
+[dependencies]
+portable-pty = "0.8"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+crossbeam-channel = "0.5"
+thiserror = "2"
+tracing = "0.1"

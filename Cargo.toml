@@ -1,0 +1,11 @@
+[workspace]
+members = ["crates/cterminal-core", "crates/cterminal-app"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Sai Charan Pogul"]
+license = "MIT"
+repository = "https://github.com/saicharanpogul/cterminal"
+description = "AI-native terminal optimized for Claude Code"

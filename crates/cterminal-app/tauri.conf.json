@@ -1,0 +1,36 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-cli/schema.json",
+  "productName": "cterminal",
+  "version": "0.1.0",
+  "identifier": "com.cterminal.app",
+  "build": {
+    "frontendDist": "../../packages/ui/dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "cd ../../packages/ui && pnpm dev",
+    "beforeBuildCommand": "cd ../../packages/ui && pnpm build"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "cterminal",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 600,
+        "minHeight": 400,
+        "decorations": false,
+        "transparent": false,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    }
+  }
+}

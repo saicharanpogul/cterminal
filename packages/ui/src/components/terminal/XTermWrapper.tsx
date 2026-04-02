@@ -1,0 +1,166 @@
+import { useEffect, useRef, useCallback } from "react";
+import { Terminal } from "@xterm/xterm";
+import { WebglAddon } from "@xterm/addon-webgl";
+import { FitAddon } from "@xterm/addon-fit";
+import { WebLinksAddon } from "@xterm/addon-web-links";
+import { Unicode11Addon } from "@xterm/addon-unicode11";
+import "@xterm/xterm/css/xterm.css";
+import { ptySpawn, ptyWrite, ptyResize, onPtyData, onPtyExit } from "@/lib/tauri";
+import { useConfigStore } from "@/stores/configStore";
+import { useTabStore } from "@/stores/tabStore";
+
+const THEME = {
+  background: "#0d0d0f",
+  foreground: "#e4e4e8",
+  cursor: "#d97757",
+  cursorAccent: "#0d0d0f",
+  selectionBackground: "#d9775740",
+  selectionForeground: "#e4e4e8",
+  black: "#1a1a20",
+  red: "#f87171",
+  green: "#4ade80",
+  yellow: "#fbbf24",
+  blue: "#60a5fa",
+  magenta: "#c084fc",
+  cyan: "#22d3ee",
+  white: "#e4e4e8",
+  brightBlack: "#4a4a55",
+  brightRed: "#fca5a5",
+  brightGreen: "#86efac",
+  brightYellow: "#fde68a",
+  brightBlue: "#93c5fd",
+  brightMagenta: "#d8b4fe",
+  brightCyan: "#67e8f9",
+  brightWhite: "#ffffff",
+};
+
+interface XTermWrapperProps {
+  sessionId: string;
+}
+
+export function XTermWrapper({ sessionId }: XTermWrapperProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const terminalRef = useRef<Terminal | null>(null);
+  const fitAddonRef = useRef<FitAddon | null>(null);
+  const spawnedRef = useRef(false);
+  const config = useConfigStore();
+
+  const handleResize = useCallback(() => {
+    const fitAddon = fitAddonRef.current;
+    const terminal = terminalRef.current;
+    if (fitAddon && terminal) {
+      fitAddon.fit();
+      ptyResize(sessionId, terminal.cols, terminal.rows).catch(() => {});
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const terminal = new Terminal({
+      theme: THEME,
+      fontFamily: config.fontFamily,
+      fontSize: config.fontSize,
+      lineHeight: config.lineHeight,
+      cursorStyle: config.cursorStyle,
+      cursorBlink: config.cursorBlink,
+      scrollback: config.scrollback,
+      allowTransparency: true,
+      macOptionIsMeta: true,
+      macOptionClickForcesSelection: true,
+      allowProposedApi: true,
+    });
+
+    const fitAddon = new FitAddon();
+    terminal.loadAddon(fitAddon);
+    terminal.loadAddon(new WebLinksAddon());
+    terminal.loadAddon(new Unicode11Addon());
+    terminal.unicode.activeVersion = "11";
+
+    terminal.open(container);
+
+    // Try WebGL, fallback to canvas
+    try {
+      terminal.loadAddon(new WebglAddon());
+    } catch {
+      console.warn("WebGL addon failed to load, using canvas renderer");
+    }
+
+    fitAddon.fit();
+
+    terminalRef.current = terminal;
+    fitAddonRef.current = fitAddon;
+
+    // Spawn PTY
+    if (!spawnedRef.current) {
+      spawnedRef.current = true;
+      ptySpawn(sessionId, terminal.cols, terminal.rows).catch((err) => {
+        terminal.writeln(`\r\n\x1b[31mFailed to spawn shell: ${err}\x1b[0m`);
+      });
+    }
+
+    // Wire terminal input → PTY
+    const onDataDisposable = terminal.onData((data) => {
+      const encoder = new TextEncoder();
+      ptyWrite(sessionId, encoder.encode(data)).catch(() => {});
+    });
+
+    // Wire terminal binary input (for mouse etc)
+    const onBinaryDisposable = terminal.onBinary((data) => {
+      const bytes = new Uint8Array(data.length);
+      for (let i = 0; i < data.length; i++) {
+        bytes[i] = data.charCodeAt(i);
+      }
+      ptyWrite(sessionId, bytes).catch(() => {});
+    });
+
+    // Listen for PTY output → terminal
+    let unlistenData: (() => void) | null = null;
+    let unlistenExit: (() => void) | null = null;
+
+    onPtyData((event) => {
+      if (event.session_id === sessionId) {
+        terminal.write(new Uint8Array(event.data));
+      }
+    }).then((fn) => {
+      unlistenData = fn;
+    });
+
+    onPtyExit((event) => {
+      if (event.session_id === sessionId) {
+        terminal.writeln(
+          `\r\n\x1b[90m[Process exited with code ${event.code ?? "unknown"}]\x1b[0m`,
+        );
+        useTabStore.getState().setTabDead(sessionId);
+      }
+    }).then((fn) => {
+      unlistenExit = fn;
+    });
+
+    // Resize observer
+    const observer = new ResizeObserver(() => {
+      handleResize();
+    });
+    observer.observe(container);
+
+    return () => {
+      observer.disconnect();
+      onDataDisposable.dispose();
+      onBinaryDisposable.dispose();
+      unlistenData?.();
+      unlistenExit?.();
+      terminal.dispose();
+      terminalRef.current = null;
+      fitAddonRef.current = null;
+    };
+  }, [sessionId]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="w-full h-full"
+      style={{ padding: "4px 8px" }}
+    />
+  );
+}

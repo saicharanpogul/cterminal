@@ -1,0 +1,22 @@
+[package]
+name = "cterminal-app"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Tauri application for cterminal"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+cterminal-core = { path = "../cterminal-core" }
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-os = "2"
+tauri-plugin-process = "2"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

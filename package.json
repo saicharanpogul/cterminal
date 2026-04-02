@@ -1,0 +1,9 @@
+{
+  "name": "cterminal",
+  "private": true,
+  "scripts": {
+    "dev": "cd packages/ui && pnpm dev",
+    "build": "cd packages/ui && pnpm build",
+    "tauri": "cd crates/cterminal-app && cargo tauri"
+  }
+}
