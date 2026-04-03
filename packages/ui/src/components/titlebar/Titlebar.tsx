@@ -1,9 +1,12 @@
 import { useClaudeStore } from "@/hooks/useClaudeDetection";
-import { usePaneStore } from "@/stores/paneStore";
+import { usePaneStore, collectLeaves } from "@/stores/paneStore";
+import { useMemo } from "react";
 
 export function Titlebar() {
-  const leaves = usePaneStore((s) => s.getAllLeaves());
+  const root = usePaneStore((s) => s.root);
   const sessions = useClaudeStore((s) => s.sessions);
+
+  const leaves = useMemo(() => collectLeaves(root), [root]);
 
   const claudeCount = leaves.filter(
     (l) => sessions[l.sessionId]?.is_running,

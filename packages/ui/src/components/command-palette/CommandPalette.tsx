@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef, useMemo } from "react";
-import { usePaneStore } from "@/stores/paneStore";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { usePaneStore, collectLeaves } from "@/stores/paneStore";
 import { ptyWrite } from "@/lib/tauri";
 import {
   Terminal,
@@ -32,13 +32,15 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const {
-    splitPane,
-    closePane,
-    activePaneId,
-    navigatePane,
-    getAllLeaves,
-  } = usePaneStore();
+  const splitPane = usePaneStore((s) => s.splitPane);
+  const closePane = usePaneStore((s) => s.closePane);
+  const activePaneId = usePaneStore((s) => s.activePaneId);
+  const navigatePane = usePaneStore((s) => s.navigatePane);
+
+  const getLeaves = useCallback(
+    () => collectLeaves(usePaneStore.getState().root),
+    [],
+  );
 
   const commands: Command[] = useMemo(
     () => [
@@ -54,7 +56,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           splitPane(activePaneId, "vertical");
           // After split, write "claude" to the new pane's PTY
           setTimeout(() => {
-            const leaves = getAllLeaves();
+            const leaves = getLeaves();
             const newLeaf = leaves[leaves.length - 1];
             if (newLeaf) {
               const encoder = new TextEncoder();
@@ -77,14 +79,14 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           // Split into 3 vertical panes and run claude in each
           splitPane(activePaneId, "vertical");
           setTimeout(() => {
-            const leaves = getAllLeaves();
+            const leaves = getLeaves();
             if (leaves.length >= 2) {
               splitPane(leaves[leaves.length - 1].id, "vertical");
             }
           }, 100);
           // Run claude in all new panes after they spawn
           setTimeout(() => {
-            const leaves = getAllLeaves();
+            const leaves = getLeaves();
             const encoder = new TextEncoder();
             for (const leaf of leaves) {
               ptyWrite(leaf.sessionId, encoder.encode("claude\n")).catch(
@@ -102,7 +104,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         icon: <Sparkles size={14} />,
         category: "claude",
         action: () => {
-          const leaf = getAllLeaves().find((l) => l.id === activePaneId);
+          const leaf = getLeaves().find((l) => l.id === activePaneId);
           if (leaf) {
             const encoder = new TextEncoder();
             ptyWrite(leaf.sessionId, encoder.encode("claude\n")).catch(
@@ -145,7 +147,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         shortcut: "Cmd+W",
         category: "pane",
         action: () => {
-          const leaves = getAllLeaves();
+          const leaves = getLeaves();
           if (leaves.length > 1) {
             closePane(activePaneId);
           }
@@ -190,7 +192,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         },
       },
     ],
-    [activePaneId, splitPane, closePane, navigatePane, getAllLeaves, onClose],
+    [activePaneId, splitPane, closePane, navigatePane, getLeaves, onClose],
   );
 
   const filtered = useMemo(() => {

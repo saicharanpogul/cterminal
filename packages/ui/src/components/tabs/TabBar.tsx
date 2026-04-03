@@ -1,18 +1,17 @@
-import { usePaneStore } from "@/stores/paneStore";
+import { usePaneStore, collectLeaves } from "@/stores/paneStore";
 import { Tab } from "./Tab";
 import { Columns2, Rows2 } from "lucide-react";
 import { ptyKill } from "@/lib/tauri";
+import { useMemo } from "react";
 
 export function TabBar() {
-  const {
-    activePaneId,
-    setActivePane,
-    splitPane,
-    closePane,
-    getAllLeaves,
-  } = usePaneStore();
+  const root = usePaneStore((s) => s.root);
+  const activePaneId = usePaneStore((s) => s.activePaneId);
+  const setActivePane = usePaneStore((s) => s.setActivePane);
+  const splitPane = usePaneStore((s) => s.splitPane);
+  const closePane = usePaneStore((s) => s.closePane);
 
-  const leaves = getAllLeaves();
+  const leaves = useMemo(() => collectLeaves(root), [root]);
 
   const handleClose = (paneId: string) => {
     const leaf = leaves.find((l) => l.id === paneId);
@@ -46,7 +45,6 @@ export function TabBar() {
       </div>
 
       <div className="flex items-center gap-0.5 px-2 shrink-0">
-        {/* Split vertical */}
         <button
           onClick={() => splitPane(activePaneId, "vertical")}
           className="flex items-center justify-center w-7 h-7 rounded text-text-muted hover:text-text-secondary hover:bg-surface-3 transition-colors"
@@ -54,7 +52,6 @@ export function TabBar() {
         >
           <Columns2 size={13} />
         </button>
-        {/* Split horizontal */}
         <button
           onClick={() => splitPane(activePaneId, "horizontal")}
           className="flex items-center justify-center w-7 h-7 rounded text-text-muted hover:text-text-secondary hover:bg-surface-3 transition-colors"

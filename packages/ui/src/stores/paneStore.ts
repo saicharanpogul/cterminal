@@ -51,12 +51,11 @@ function findNode(root: PaneNode, id: string): PaneNode | null {
   return null;
 }
 
-function collectLeaves(node: PaneNode): PaneLeaf[] {
+export function collectLeaves(node: PaneNode): PaneLeaf[] {
   if (node.type === "leaf") return [node];
   return node.children.flatMap(collectLeaves);
 }
 
-/** Remove a leaf and simplify the tree (collapse single-child splits) */
 function removeLeaf(root: PaneNode, leafId: string): PaneNode | null {
   if (root.type === "leaf") {
     return root.id === leafId ? null : root;
@@ -74,7 +73,6 @@ function removeLeaf(root: PaneNode, leafId: string): PaneNode | null {
   return { ...root, children: newChildren };
 }
 
-/** Replace a leaf with a new node (used for splitting) */
 function replaceNode(
   root: PaneNode,
   targetId: string,
@@ -135,8 +133,6 @@ interface PaneState {
   setResizeRatio: (splitId: string, ratio: number) => void;
   setPaneTitle: (sessionId: string, title: string) => void;
   setPaneDead: (sessionId: string) => void;
-  getActiveLeaf: () => PaneLeaf | null;
-  getAllLeaves: () => PaneLeaf[];
   navigatePane: (direction: "left" | "right" | "up" | "down") => void;
 }
 
@@ -171,7 +167,7 @@ export const usePaneStore = create<PaneState>((set, get) => {
     closePane: (paneId: string) => {
       set((state) => {
         const leaves = collectLeaves(state.root);
-        if (leaves.length <= 1) return state; // Don't close last pane
+        if (leaves.length <= 1) return state;
 
         const newRoot = removeLeaf(state.root, paneId);
         if (!newRoot) return state;
@@ -214,18 +210,7 @@ export const usePaneStore = create<PaneState>((set, get) => {
       }));
     },
 
-    getActiveLeaf: () => {
-      const state = get();
-      const leaves = collectLeaves(state.root);
-      return leaves.find((l) => l.id === state.activePaneId) ?? null;
-    },
-
-    getAllLeaves: () => {
-      return collectLeaves(get().root);
-    },
-
     navigatePane: (direction: "left" | "right" | "up" | "down") => {
-      // Simple leaf-order navigation for now
       const state = get();
       const leaves = collectLeaves(state.root);
       const idx = leaves.findIndex((l) => l.id === state.activePaneId);

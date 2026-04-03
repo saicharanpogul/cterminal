@@ -34,8 +34,10 @@ fn main() {
             commands::pty::claude_status,
         ])
         .setup(|app| {
-            // Set the window to show after it's ready (prevents flash)
             let window = app.get_webview_window("main").unwrap();
+            // Open devtools in debug mode
+            #[cfg(debug_assertions)]
+            window.open_devtools();
             window.show().unwrap();
             tracing::info!("cterminal window ready");
             Ok(())

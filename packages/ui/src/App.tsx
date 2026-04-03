@@ -3,21 +3,19 @@ import { TabBar } from "./components/tabs/TabBar";
 import { PaneLayout } from "./components/panes/PaneLayout";
 import { ClaudeStatusBar } from "./components/terminal/ClaudeStatusBar";
 import { CommandPalette } from "./components/command-palette/CommandPalette";
-import { usePaneStore } from "./stores/paneStore";
-import { useEffect, useState } from "react";
+import { usePaneStore, collectLeaves } from "./stores/paneStore";
+import { useEffect, useState, useCallback } from "react";
 import { ptyKill, ptyWrite } from "./lib/tauri";
 
 function App() {
-  const {
-    splitPane,
-    closePane,
-    activePaneId,
-    navigatePane,
-    getAllLeaves,
-  } = usePaneStore();
+  const activePaneId = usePaneStore((s) => s.activePaneId);
+  const splitPane = usePaneStore((s) => s.splitPane);
+  const closePane = usePaneStore((s) => s.closePane);
+  const navigatePane = usePaneStore((s) => s.navigatePane);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
-  // Global keyboard shortcuts
+  const getLeaves = useCallback(() => collectLeaves(usePaneStore.getState().root), []);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMeta = e.metaKey || e.ctrlKey;
@@ -34,8 +32,8 @@ function App() {
         e.preventDefault();
         splitPane(activePaneId, "vertical");
         setTimeout(() => {
-          const leaves = getAllLeaves();
-          const newLeaf = leaves[leaves.length - 1];
+          const currentLeaves = getLeaves();
+          const newLeaf = currentLeaves[currentLeaves.length - 1];
           if (newLeaf) {
             const encoder = new TextEncoder();
             ptyWrite(newLeaf.sessionId, encoder.encode("claude\n")).catch(
@@ -51,15 +49,15 @@ function App() {
         e.preventDefault();
         splitPane(activePaneId, "vertical");
         setTimeout(() => {
-          const leaves = getAllLeaves();
-          if (leaves.length >= 2) {
-            splitPane(leaves[leaves.length - 1].id, "vertical");
+          const currentLeaves = getLeaves();
+          if (currentLeaves.length >= 2) {
+            splitPane(currentLeaves[currentLeaves.length - 1].id, "vertical");
           }
         }, 100);
         setTimeout(() => {
-          const leaves = getAllLeaves();
+          const currentLeaves = getLeaves();
           const encoder = new TextEncoder();
-          for (const leaf of leaves) {
+          for (const leaf of currentLeaves) {
             ptyWrite(leaf.sessionId, encoder.encode("claude\n")).catch(
               () => {},
             );
@@ -83,12 +81,12 @@ function App() {
       // Close pane: Cmd+W
       if (isMeta && e.key === "w") {
         e.preventDefault();
-        const leaves = getAllLeaves();
-        const activeLeaf = leaves.find((l) => l.id === activePaneId);
+        const currentLeaves = getLeaves();
+        const activeLeaf = currentLeaves.find((l) => l.id === activePaneId);
         if (activeLeaf) {
           ptyKill(activeLeaf.sessionId).catch(() => {});
         }
-        if (leaves.length > 1) {
+        if (currentLeaves.length > 1) {
           closePane(activePaneId);
         }
       }
@@ -113,7 +111,7 @@ function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activePaneId, splitPane, closePane, navigatePane, getAllLeaves]);
+  }, [activePaneId, splitPane, closePane, navigatePane, getLeaves]);
 
   return (
     <div className="flex flex-col h-screen bg-surface-0">

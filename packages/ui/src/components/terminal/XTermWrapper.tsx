@@ -104,7 +104,7 @@ export function XTermWrapper({ sessionId, isActive }: XTermWrapperProps) {
 
     terminal.open(container);
 
-    // Try WebGL, fallback to canvas
+    // Try WebGL after terminal is opened, fallback to canvas
     try {
       const webglAddon = new WebglAddon();
       webglAddon.onContextLoss(() => {
@@ -116,21 +116,31 @@ export function XTermWrapper({ sessionId, isActive }: XTermWrapperProps) {
       console.warn("WebGL addon failed to load, using canvas renderer:", e);
     }
 
-    fitAddon.fit();
-
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
 
-    // Spawn PTY only once per session ID (survives StrictMode remount)
-    if (!spawnedSessions.has(sessionId)) {
-      spawnedSessions.add(sessionId);
-      ptySpawn(sessionId, terminal.cols, terminal.rows).catch((err) => {
-        terminal.writeln(
-          `\r\n\x1b[31mFailed to spawn shell: ${err}\x1b[0m`,
-        );
-        spawnedSessions.delete(sessionId);
-      });
-    }
+    // Delay fit() until container has dimensions (avoids renderer crash)
+    requestAnimationFrame(() => {
+      if (!terminalRef.current) return;
+      try {
+        fitAddon.fit();
+      } catch (e) {
+        console.warn("Initial fit failed, retrying:", e);
+      }
+
+      // Spawn PTY only once per session ID (survives StrictMode remount)
+      if (!spawnedSessions.has(sessionId)) {
+        spawnedSessions.add(sessionId);
+        const cols = terminal.cols || 80;
+        const rows = terminal.rows || 24;
+        ptySpawn(sessionId, cols, rows).catch((err) => {
+          terminal.writeln(
+            `\r\n\x1b[31mFailed to spawn shell: ${err}\x1b[0m`,
+          );
+          spawnedSessions.delete(sessionId);
+        });
+      }
+    });
 
     // Wire terminal input -> PTY
     const onDataDisposable = terminal.onData((data) => {
