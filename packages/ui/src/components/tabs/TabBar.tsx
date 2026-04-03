@@ -1,6 +1,6 @@
 import { usePaneStore, collectLeaves } from "@/stores/paneStore";
 import { Tab } from "./Tab";
-import { Columns2, Rows2 } from "lucide-react";
+import { Plus, Columns2, Rows2 } from "lucide-react";
 import { ptyKill } from "@/lib/tauri";
 import { useMemo } from "react";
 
@@ -45,6 +45,16 @@ export function TabBar() {
       </div>
 
       <div className="flex items-center gap-0.5 px-2 shrink-0">
+        {/* New tab */}
+        <button
+          onClick={() => splitPane(activePaneId, "vertical")}
+          className="flex items-center justify-center w-7 h-7 rounded text-text-muted hover:text-text-primary hover:bg-surface-3 transition-colors"
+          title="New terminal (Cmd+D)"
+        >
+          <Plus size={14} />
+        </button>
+        <div className="w-px h-4 bg-border mx-0.5" />
+        {/* Split controls */}
         <button
           onClick={() => splitPane(activePaneId, "vertical")}
           className="flex items-center justify-center w-7 h-7 rounded text-text-muted hover:text-text-secondary hover:bg-surface-3 transition-colors"

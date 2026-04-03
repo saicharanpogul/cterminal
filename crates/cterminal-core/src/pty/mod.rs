@@ -2,12 +2,8 @@ use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Duration, Instant};
 
 use crate::shell;
-
-const BATCH_INTERVAL_MS: u64 = 4;
-const BATCH_MAX_BYTES: usize = 16 * 1024;
 
 #[derive(Debug, thiserror::Error)]
 pub enum PtyError {
@@ -52,22 +48,17 @@ impl PtySession {
             .map_err(|e| PtyError::OpenFailed(e.to_string()))?;
 
         let shell = shell_path.unwrap_or_else(shell::detect_shell);
-        let mut cmd = CommandBuilder::new(&shell);
-        cmd.args(["-l"]); // login shell
 
-        // Inherit environment
-        if let Ok(home) = std::env::var("HOME") {
-            cmd.env("HOME", home);
-        }
-        if let Ok(user) = std::env::var("USER") {
-            cmd.env("USER", user);
-        }
-        if let Ok(path) = std::env::var("PATH") {
-            cmd.env("PATH", path);
-        }
+        // Inherit the full parent environment so the shell has all
+        // permissions, paths, and config the user expects.
+        let mut cmd = CommandBuilder::new_default_prog();
+        cmd.args(["-l"]); // login shell
+        cmd.env("SHELL", &shell);
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
-        cmd.env("LANG", "en_US.UTF-8");
+        if std::env::var("LANG").is_err() {
+            cmd.env("LANG", "en_US.UTF-8");
+        }
 
         let mut child = pair
             .slave
@@ -92,39 +83,18 @@ impl PtySession {
         let master = Arc::new(Mutex::new(pair.master));
         let writer = Arc::new(Mutex::new(writer));
 
-        // Reader thread with batched output
+        // Reader thread — flush immediately on every read.
+        // Blocking read() naturally coalesces fast bursts (cat large file),
+        // while ensuring prompts and small outputs appear instantly.
         thread::spawn(move || {
-            let mut buf = [0u8; 4096];
-            let mut batch = Vec::with_capacity(BATCH_MAX_BYTES);
-            let mut last_flush = Instant::now();
-
+            let mut buf = [0u8; 8192];
             loop {
                 match reader.read(&mut buf) {
-                    Ok(0) => {
-                        if !batch.is_empty() {
-                            on_data(batch.clone());
-                            batch.clear();
-                        }
-                        break;
-                    }
+                    Ok(0) => break,
                     Ok(n) => {
-                        batch.extend_from_slice(&buf[..n]);
-
-                        let elapsed = last_flush.elapsed();
-                        if batch.len() >= BATCH_MAX_BYTES
-                            || elapsed >= Duration::from_millis(BATCH_INTERVAL_MS)
-                        {
-                            on_data(batch.clone());
-                            batch.clear();
-                            last_flush = Instant::now();
-                        }
+                        on_data(buf[..n].to_vec());
                     }
-                    Err(_) => {
-                        if !batch.is_empty() {
-                            on_data(batch.clone());
-                        }
-                        break;
-                    }
+                    Err(_) => break,
                 }
             }
         });

@@ -32,6 +32,11 @@
       "csp": null
     }
   },
+  "bundle": {
+    "macOS": {
+      "entitlements": "Entitlements.plist"
+    }
+  },
   "plugins": {
     "shell": {
       "open": true
