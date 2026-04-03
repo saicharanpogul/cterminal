@@ -3,6 +3,7 @@ import { TabBar } from "./components/tabs/TabBar";
 import { PaneLayout } from "./components/panes/PaneLayout";
 import { ClaudeStatusBar } from "./components/terminal/ClaudeStatusBar";
 import { CommandPalette } from "./components/command-palette/CommandPalette";
+import { SidePanel } from "./components/panels/SidePanel";
 import { usePaneStore, collectLeaves } from "./stores/paneStore";
 import { useEffect, useState, useCallback } from "react";
 import { ptyKill, ptyWrite } from "./lib/tauri";
@@ -13,12 +14,20 @@ function App() {
   const closePane = usePaneStore((s) => s.closePane);
   const navigatePane = usePaneStore((s) => s.navigatePane);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [sidePanelOpen, setSidePanelOpen] = useState(false);
 
   const getLeaves = useCallback(() => collectLeaves(usePaneStore.getState().root), []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMeta = e.metaKey || e.ctrlKey;
+
+      // Side panel: Cmd+B
+      if (isMeta && e.key === "b" && !e.shiftKey) {
+        e.preventDefault();
+        setSidePanelOpen((v) => !v);
+        return;
+      }
 
       // Command palette: Cmd+Shift+P
       if (isMeta && e.shiftKey && e.key === "P") {
@@ -117,7 +126,13 @@ function App() {
     <div className="flex flex-col h-screen bg-surface-0">
       <Titlebar />
       <TabBar />
-      <PaneLayout />
+      <div className="flex flex-1 overflow-hidden">
+        <PaneLayout />
+        <SidePanel
+          isOpen={sidePanelOpen}
+          onClose={() => setSidePanelOpen(false)}
+        />
+      </div>
       <ClaudeStatusBar />
       <CommandPalette
         isOpen={commandPaletteOpen}

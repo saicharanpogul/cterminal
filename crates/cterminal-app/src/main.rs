@@ -32,6 +32,9 @@ fn main() {
             commands::pty::pty_resize,
             commands::pty::pty_kill,
             commands::pty::claude_status,
+            commands::workspace::get_plan,
+            commands::workspace::get_diff,
+            commands::workspace::get_tasks,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();

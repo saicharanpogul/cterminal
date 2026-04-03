@@ -79,6 +79,46 @@ export function onPtyImage(
   return listen<PtyImageEvent>("pty:image", (event) => callback(event.payload));
 }
 
+// Workspace: plan, diff, tasks
+export interface PlanFile {
+  path: string;
+  name: string;
+  content: string;
+  modified: number;
+}
+
+export interface FileDiff {
+  path: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  diff: string;
+}
+
+export interface DiffInfo {
+  files_changed: FileDiff[];
+  summary: string;
+}
+
+export interface TaskInfo {
+  id: string;
+  subject: string;
+  status: string;
+  description: string | null;
+}
+
+export async function getPlan(): Promise<PlanFile | null> {
+  return invoke<PlanFile | null>("get_plan");
+}
+
+export async function getDiff(): Promise<DiffInfo | null> {
+  return invoke<DiffInfo | null>("get_diff");
+}
+
+export async function getTasks(): Promise<TaskInfo[]> {
+  return invoke<TaskInfo[]>("get_tasks");
+}
+
 // Claude Code detection
 export interface ClaudeStatusResult {
   is_running: boolean;
