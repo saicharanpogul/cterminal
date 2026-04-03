@@ -48,12 +48,14 @@ impl PtySession {
             .map_err(|e| PtyError::OpenFailed(e.to_string()))?;
 
         let shell = shell_path.unwrap_or_else(shell::detect_shell);
-
-        // Inherit the full parent environment so the shell has all
-        // permissions, paths, and config the user expects.
-        let mut cmd = CommandBuilder::new_default_prog();
+        let mut cmd = CommandBuilder::new(&shell);
         cmd.args(["-l"]); // login shell
-        cmd.env("SHELL", &shell);
+
+        // Inherit the full parent environment
+        for (key, value) in std::env::vars() {
+            cmd.env(key, value);
+        }
+        // Override terminal-specific vars
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
         if std::env::var("LANG").is_err() {
