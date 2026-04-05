@@ -17,11 +17,13 @@ pub struct SessionRecord {
 }
 
 fn sessions_dir() -> PathBuf {
-    let dir = dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join(".cterminal")
-        .join("sessions");
-    fs::create_dir_all(&dir).ok();
+    let home = dirs::home_dir()
+        .or_else(|| std::env::var("HOME").ok().map(PathBuf::from))
+        .unwrap_or_else(|| PathBuf::from("/tmp"));
+    let dir = home.join(".cterminal").join("sessions");
+    if let Err(e) = fs::create_dir_all(&dir) {
+        tracing::warn!("Failed to create sessions dir {:?}: {}", dir, e);
+    }
     dir
 }
 

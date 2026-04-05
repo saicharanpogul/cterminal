@@ -13,6 +13,7 @@ pub fn save_session(
     shell: String,
     is_claude: bool,
 ) {
+    tracing::debug!("Saving session: {} (claude: {})", id, is_claude);
     let record = SessionRecord {
         id,
         title,

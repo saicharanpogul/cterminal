@@ -27,7 +27,7 @@ function App() {
 
   // Auto-save sessions periodically
   useEffect(() => {
-    const interval = setInterval(() => {
+    const doSave = () => {
       const leaves = getLeaves();
       for (const leaf of leaves) {
         const isClaude = claudeSessions[leaf.sessionId]?.is_running ?? false;
@@ -37,9 +37,12 @@ function App() {
           ".",
           "zsh",
           isClaude,
-        ).catch(() => {});
+        ).catch((e) => console.warn("Session save failed:", e));
       }
-    }, 10000);
+    };
+    // Save immediately on mount
+    setTimeout(doSave, 2000);
+    const interval = setInterval(doSave, 10000);
     return () => clearInterval(interval);
   }, [getLeaves, claudeSessions]);
 
