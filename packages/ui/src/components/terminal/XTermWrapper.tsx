@@ -16,7 +16,8 @@ import { useConfigStore } from "@/stores/configStore";
 import { usePaneStore } from "@/stores/paneStore";
 import { useClaudeDetection } from "@/hooks/useClaudeDetection";
 import { InlineImageOverlay } from "./InlineImageOverlay";
-import { WidgetOverlay } from "../widgets/WidgetOverlay";
+// Widget overlay disabled — needs a proper protocol from Claude Code
+// import { WidgetOverlay } from "../widgets/WidgetOverlay";
 
 const THEME = {
   background: "#0d0d0f",
@@ -207,11 +208,6 @@ export function XTermWrapper({ sessionId, isActive }: XTermWrapperProps) {
         ref={containerRef}
         className="w-full h-full"
         style={{ padding: "4px 8px" }}
-      />
-      {/* Widget overlays — detect and render Claude Code widgets natively */}
-      <WidgetOverlay
-        terminal={terminalRef.current}
-        isClaudeRunning={isClaudeRunning}
       />
       {/* Inline image overlay */}
       <InlineImageOverlay sessionId={sessionId} />

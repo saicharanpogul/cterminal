@@ -35,6 +35,10 @@ fn main() {
             commands::workspace::get_plan,
             commands::workspace::get_diff,
             commands::workspace::get_tasks,
+            commands::sessions::list_sessions,
+            commands::sessions::save_session,
+            commands::sessions::delete_session,
+            commands::sessions::clear_session_history,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();

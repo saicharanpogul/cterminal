@@ -119,6 +119,41 @@ export async function getTasks(): Promise<TaskInfo[]> {
   return invoke<TaskInfo[]>("get_tasks");
 }
 
+// Session management
+export interface SessionRecord {
+  id: string;
+  title: string;
+  working_dir: string;
+  shell: string;
+  created_at: number;
+  last_active: number;
+  is_claude: boolean;
+}
+
+export async function listSessions(): Promise<SessionRecord[]> {
+  return invoke<SessionRecord[]>("list_sessions");
+}
+
+export async function saveSession(
+  id: string,
+  title: string,
+  workingDir: string,
+  shell: string,
+  isClaude: boolean,
+): Promise<void> {
+  return invoke("save_session", {
+    id,
+    title,
+    workingDir,
+    shell,
+    isClaude,
+  });
+}
+
+export async function deleteSession(id: string): Promise<void> {
+  return invoke("delete_session", { id });
+}
+
 // Claude Code detection
 export interface ClaudeStatusResult {
   is_running: boolean;

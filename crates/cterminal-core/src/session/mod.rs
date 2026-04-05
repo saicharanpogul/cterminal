@@ -1,3 +1,5 @@
+pub mod history;
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 

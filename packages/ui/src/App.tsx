@@ -4,9 +4,11 @@ import { PaneLayout } from "./components/panes/PaneLayout";
 import { ClaudeStatusBar } from "./components/terminal/ClaudeStatusBar";
 import { CommandPalette } from "./components/command-palette/CommandPalette";
 import { SidePanel } from "./components/panels/SidePanel";
+import { SessionList } from "./components/sessions/SessionList";
 import { usePaneStore, collectLeaves } from "./stores/paneStore";
 import { useEffect, useState, useCallback } from "react";
-import { ptyKill, ptyWrite } from "./lib/tauri";
+import { ptyKill, ptyWrite, saveSession } from "./lib/tauri";
+import { useClaudeStore } from "./hooks/useClaudeDetection";
 
 function App() {
   const activePaneId = usePaneStore((s) => s.activePaneId);
@@ -15,12 +17,39 @@ function App() {
   const navigatePane = usePaneStore((s) => s.navigatePane);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
+  const [sessionListOpen, setSessionListOpen] = useState(false);
+  const claudeSessions = useClaudeStore((s) => s.sessions);
 
   const getLeaves = useCallback(() => collectLeaves(usePaneStore.getState().root), []);
+
+  // Auto-save sessions periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const leaves = getLeaves();
+      for (const leaf of leaves) {
+        const isClaude = claudeSessions[leaf.sessionId]?.is_running ?? false;
+        saveSession(
+          leaf.sessionId,
+          isClaude ? "Claude Session" : leaf.title || "Terminal",
+          ".",
+          "zsh",
+          isClaude,
+        ).catch(() => {});
+      }
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [getLeaves, claudeSessions]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMeta = e.metaKey || e.ctrlKey;
+
+      // Session list: Cmd+L
+      if (isMeta && e.key === "l" && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        setSessionListOpen((v) => !v);
+        return;
+      }
 
       // Side panel: Cmd+B
       if (isMeta && e.key === "b" && !e.shiftKey) {
@@ -137,6 +166,10 @@ function App() {
       <CommandPalette
         isOpen={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
+      />
+      <SessionList
+        isOpen={sessionListOpen}
+        onClose={() => setSessionListOpen(false)}
       />
     </div>
   );
