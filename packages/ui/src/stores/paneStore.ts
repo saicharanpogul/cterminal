@@ -15,11 +15,17 @@ export interface PaneSplit {
   id: string;
   direction: SplitDirection;
   children: PaneNode[];
-  /** Ratio of first child (0-1). 0.5 = equal split. */
   ratio: number;
 }
 
 export type PaneNode = PaneLeaf | PaneSplit;
+
+export interface TabEntry {
+  id: string;
+  root: PaneNode;
+  activePaneId: string;
+  title: string;
+}
 
 let paneCounter = 0;
 function nextPaneId(): string {
@@ -28,6 +34,11 @@ function nextPaneId(): string {
 
 function nextSplitId(): string {
   return `split-${++paneCounter}`;
+}
+
+let tabCounter = 0;
+function nextTabId(): string {
+  return `tab-${++tabCounter}`;
 }
 
 function createLeaf(sessionId?: string): PaneLeaf {
@@ -60,73 +71,64 @@ function removeLeaf(root: PaneNode, leafId: string): PaneNode | null {
   if (root.type === "leaf") {
     return root.id === leafId ? null : root;
   }
-
   const newChildren: PaneNode[] = [];
   for (const child of root.children) {
     const result = removeLeaf(child, leafId);
     if (result) newChildren.push(result);
   }
-
   if (newChildren.length === 0) return null;
   if (newChildren.length === 1) return newChildren[0];
-
   return { ...root, children: newChildren };
 }
 
-function replaceNode(
-  root: PaneNode,
-  targetId: string,
-  replacement: PaneNode,
-): PaneNode {
+function replaceNode(root: PaneNode, targetId: string, replacement: PaneNode): PaneNode {
   if (root.id === targetId) return replacement;
   if (root.type === "split") {
-    return {
-      ...root,
-      children: root.children.map((c) =>
-        replaceNode(c, targetId, replacement),
-      ),
-    };
+    return { ...root, children: root.children.map((c) => replaceNode(c, targetId, replacement)) };
   }
   return root;
 }
 
-function updateLeafInTree(
-  root: PaneNode,
-  sessionId: string,
-  updater: (leaf: PaneLeaf) => PaneLeaf,
-): PaneNode {
+function updateLeafInTree(root: PaneNode, sessionId: string, updater: (leaf: PaneLeaf) => PaneLeaf): PaneNode {
   if (root.type === "leaf") {
     return root.sessionId === sessionId ? updater(root) : root;
   }
-  return {
-    ...root,
-    children: root.children.map((c) =>
-      updateLeafInTree(c, sessionId, updater),
-    ),
-  };
+  return { ...root, children: root.children.map((c) => updateLeafInTree(c, sessionId, updater)) };
 }
 
-function updateSplitRatio(
-  root: PaneNode,
-  splitId: string,
-  ratio: number,
-): PaneNode {
+function updateSplitRatio(root: PaneNode, splitId: string, ratio: number): PaneNode {
   if (root.type === "split") {
-    const updated: PaneSplit = {
+    return {
       ...root,
       ratio: root.id === splitId ? ratio : root.ratio,
       children: root.children.map((c) => updateSplitRatio(c, splitId, ratio)),
     };
-    return updated;
   }
   return root;
 }
 
-interface PaneState {
-  root: PaneNode;
-  activePaneId: string;
+function createTab(): TabEntry {
+  const leaf = createLeaf();
+  return {
+    id: nextTabId(),
+    root: leaf,
+    activePaneId: leaf.id,
+    title: "Terminal",
+  };
+}
 
-  // Actions
+interface PaneState {
+  tabs: TabEntry[];
+  activeTabId: string;
+
+  // Tab actions
+  addTab: () => void;
+  closeTab: (tabId: string) => void;
+  setActiveTab: (tabId: string) => void;
+
+  // Pane actions (operate on the active tab)
+  activePaneId: string;
+  root: PaneNode;
   splitPane: (paneId: string, direction: SplitDirection) => void;
   closePane: (paneId: string) => void;
   setActivePane: (paneId: string) => void;
@@ -137,17 +139,68 @@ interface PaneState {
 }
 
 export const usePaneStore = create<PaneState>((set, get) => {
-  const initialLeaf = createLeaf();
+  const initialTab = createTab();
 
   return {
-    root: initialLeaf,
-    activePaneId: initialLeaf.id,
+    tabs: [initialTab],
+    activeTabId: initialTab.id,
+    activePaneId: initialTab.activePaneId,
+    root: initialTab.root,
+
+    addTab: () => {
+      const tab = createTab();
+      set((state) => ({
+        tabs: [...state.tabs, tab],
+        activeTabId: tab.id,
+        activePaneId: tab.activePaneId,
+        root: tab.root,
+      }));
+    },
+
+    closeTab: (tabId: string) => {
+      set((state) => {
+        if (state.tabs.length <= 1) return state;
+        const idx = state.tabs.findIndex((t) => t.id === tabId);
+        const newTabs = state.tabs.filter((t) => t.id !== tabId);
+        let newActiveTab: TabEntry;
+        if (state.activeTabId === tabId) {
+          const newIdx = Math.min(idx, newTabs.length - 1);
+          newActiveTab = newTabs[newIdx];
+        } else {
+          newActiveTab = newTabs.find((t) => t.id === state.activeTabId) ?? newTabs[0];
+        }
+        return {
+          tabs: newTabs,
+          activeTabId: newActiveTab.id,
+          activePaneId: newActiveTab.activePaneId,
+          root: newActiveTab.root,
+        };
+      });
+    },
+
+    setActiveTab: (tabId: string) => {
+      set((state) => {
+        // Save current tab state first
+        const updatedTabs = state.tabs.map((t) =>
+          t.id === state.activeTabId
+            ? { ...t, root: state.root, activePaneId: state.activePaneId }
+            : t,
+        );
+        const target = updatedTabs.find((t) => t.id === tabId);
+        if (!target) return state;
+        return {
+          tabs: updatedTabs,
+          activeTabId: tabId,
+          activePaneId: target.activePaneId,
+          root: target.root,
+        };
+      });
+    },
 
     splitPane: (paneId: string, direction: SplitDirection) => {
       set((state) => {
         const target = findNode(state.root, paneId);
         if (!target || target.type !== "leaf") return state;
-
         const newLeaf = createLeaf();
         const split: PaneSplit = {
           type: "split",
@@ -156,11 +209,14 @@ export const usePaneStore = create<PaneState>((set, get) => {
           children: [target, newLeaf],
           ratio: 0.5,
         };
-
-        return {
-          root: replaceNode(state.root, paneId, split),
-          activePaneId: newLeaf.id,
-        };
+        const newRoot = replaceNode(state.root, paneId, split);
+        // Also update the tab entry
+        const updatedTabs = state.tabs.map((t) =>
+          t.id === state.activeTabId
+            ? { ...t, root: newRoot, activePaneId: newLeaf.id }
+            : t,
+        );
+        return { root: newRoot, activePaneId: newLeaf.id, tabs: updatedTabs };
       });
     },
 
@@ -168,22 +224,29 @@ export const usePaneStore = create<PaneState>((set, get) => {
       set((state) => {
         const leaves = collectLeaves(state.root);
         if (leaves.length <= 1) return state;
-
         const newRoot = removeLeaf(state.root, paneId);
         if (!newRoot) return state;
-
         let newActive = state.activePaneId;
         if (state.activePaneId === paneId) {
           const remaining = collectLeaves(newRoot);
           newActive = remaining[0]?.id ?? state.activePaneId;
         }
-
-        return { root: newRoot, activePaneId: newActive };
+        const updatedTabs = state.tabs.map((t) =>
+          t.id === state.activeTabId
+            ? { ...t, root: newRoot, activePaneId: newActive }
+            : t,
+        );
+        return { root: newRoot, activePaneId: newActive, tabs: updatedTabs };
       });
     },
 
     setActivePane: (paneId: string) => {
-      set({ activePaneId: paneId });
+      set((state) => {
+        const updatedTabs = state.tabs.map((t) =>
+          t.id === state.activeTabId ? { ...t, activePaneId: paneId } : t,
+        );
+        return { activePaneId: paneId, tabs: updatedTabs };
+      });
     },
 
     setResizeRatio: (splitId: string, ratio: number) => {
@@ -194,19 +257,13 @@ export const usePaneStore = create<PaneState>((set, get) => {
 
     setPaneTitle: (sessionId: string, title: string) => {
       set((state) => ({
-        root: updateLeafInTree(state.root, sessionId, (leaf) => ({
-          ...leaf,
-          title,
-        })),
+        root: updateLeafInTree(state.root, sessionId, (leaf) => ({ ...leaf, title })),
       }));
     },
 
     setPaneDead: (sessionId: string) => {
       set((state) => ({
-        root: updateLeafInTree(state.root, sessionId, (leaf) => ({
-          ...leaf,
-          isAlive: false,
-        })),
+        root: updateLeafInTree(state.root, sessionId, (leaf) => ({ ...leaf, isAlive: false })),
       }));
     },
 
@@ -215,7 +272,6 @@ export const usePaneStore = create<PaneState>((set, get) => {
       const leaves = collectLeaves(state.root);
       const idx = leaves.findIndex((l) => l.id === state.activePaneId);
       if (idx === -1) return;
-
       let newIdx: number;
       if (direction === "right" || direction === "down") {
         newIdx = (idx + 1) % leaves.length;

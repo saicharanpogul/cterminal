@@ -12,8 +12,11 @@ import { useClaudeStore } from "./hooks/useClaudeDetection";
 
 function App() {
   const activePaneId = usePaneStore((s) => s.activePaneId);
+  const activeTabId = usePaneStore((s) => s.activeTabId);
   const splitPane = usePaneStore((s) => s.splitPane);
   const closePane = usePaneStore((s) => s.closePane);
+  const addTab = usePaneStore((s) => s.addTab);
+  const closeTab = usePaneStore((s) => s.closeTab);
   const navigatePane = usePaneStore((s) => s.navigatePane);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
@@ -55,6 +58,13 @@ function App() {
       if (isMeta && e.key === "b" && !e.shiftKey) {
         e.preventDefault();
         setSidePanelOpen((v) => !v);
+        return;
+      }
+
+      // New tab: Cmd+T
+      if (isMeta && e.key === "t" && !e.shiftKey) {
+        e.preventDefault();
+        addTab();
         return;
       }
 
@@ -116,16 +126,24 @@ function App() {
         splitPane(activePaneId, "horizontal");
       }
 
-      // Close pane: Cmd+W
+      // Close pane/tab: Cmd+W
       if (isMeta && e.key === "w") {
         e.preventDefault();
         const currentLeaves = getLeaves();
-        const activeLeaf = currentLeaves.find((l) => l.id === activePaneId);
-        if (activeLeaf) {
-          ptyKill(activeLeaf.sessionId).catch(() => {});
-        }
         if (currentLeaves.length > 1) {
+          // Multiple panes — close just the active pane
+          const activeLeaf = currentLeaves.find((l) => l.id === activePaneId);
+          if (activeLeaf) {
+            ptyKill(activeLeaf.sessionId).catch(() => {});
+          }
           closePane(activePaneId);
+        } else {
+          // Single pane — close the whole tab
+          const activeLeaf = currentLeaves[0];
+          if (activeLeaf) {
+            ptyKill(activeLeaf.sessionId).catch(() => {});
+          }
+          closeTab(activeTabId);
         }
       }
 
@@ -149,7 +167,7 @@ function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activePaneId, splitPane, closePane, navigatePane, getLeaves]);
+  }, [activePaneId, activeTabId, splitPane, closePane, closeTab, addTab, navigatePane, getLeaves]);
 
   return (
     <div className="flex flex-col h-screen bg-surface-0">
