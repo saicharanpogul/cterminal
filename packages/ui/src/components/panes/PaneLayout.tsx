@@ -1,48 +1,73 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useMemo } from "react";
 import {
   type PaneNode,
   type PaneSplit,
   type PaneLeaf,
   usePaneStore,
+  collectLeaves,
 } from "@/stores/paneStore";
 import { XTermWrapper } from "@/components/terminal/XTermWrapper";
+import { X } from "lucide-react";
+import { ptyKill } from "@/lib/tauri";
 
 export function PaneLayout() {
   const root = usePaneStore((s) => s.root);
+  const totalLeaves = useMemo(() => collectLeaves(root).length, [root]);
+
   return (
     <div className="flex-1 relative overflow-hidden">
-      <PaneNodeView node={root} />
+      <PaneNodeView node={root} showClose={totalLeaves > 1} />
     </div>
   );
 }
 
-function PaneNodeView({ node }: { node: PaneNode }) {
+function PaneNodeView({ node, showClose }: { node: PaneNode; showClose: boolean }) {
   if (node.type === "leaf") {
-    return <PaneLeafView leaf={node} />;
+    return <PaneLeafView leaf={node} showClose={showClose} />;
   }
-  return <PaneSplitView split={node} />;
+  return <PaneSplitView split={node} showClose={showClose} />;
 }
 
-function PaneLeafView({ leaf }: { leaf: PaneLeaf }) {
+function PaneLeafView({ leaf, showClose }: { leaf: PaneLeaf; showClose: boolean }) {
   const activePaneId = usePaneStore((s) => s.activePaneId);
   const setActivePane = usePaneStore((s) => s.setActivePane);
+  const closePane = usePaneStore((s) => s.closePane);
   const isActive = leaf.id === activePaneId;
+  const [hovered, setHovered] = useState(false);
+
+  const handleClose = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    ptyKill(leaf.sessionId).catch(() => {});
+    closePane(leaf.id);
+  };
 
   return (
     <div
       className="w-full h-full relative"
       onMouseDown={() => setActivePane(leaf.id)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
-      {/* Active pane indicator */}
-      {isActive && (
+      {/* Active pane border */}
+      {isActive && showClose && (
         <div className="absolute inset-0 pointer-events-none z-10 border border-accent/30 rounded-sm" />
+      )}
+      {/* Close pane button */}
+      {showClose && (isActive || hovered) && (
+        <button
+          onClick={handleClose}
+          className="absolute top-1 right-1 z-20 w-5 h-5 flex items-center justify-center rounded bg-surface-2/80 hover:bg-red-500/20 text-text-muted hover:text-red-400 transition-colors backdrop-blur-sm"
+          title="Close pane (Cmd+W)"
+        >
+          <X size={10} />
+        </button>
       )}
       <XTermWrapper sessionId={leaf.sessionId} isActive={isActive} />
     </div>
   );
 }
 
-function PaneSplitView({ split }: { split: PaneSplit }) {
+function PaneSplitView({ split, showClose }: { split: PaneSplit; showClose: boolean }) {
   const setResizeRatio = usePaneStore((s) => s.setResizeRatio);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -98,7 +123,7 @@ function PaneSplitView({ split }: { split: PaneSplit }) {
           overflow: "hidden",
         }}
       >
-        <PaneNodeView node={split.children[0]} />
+        <PaneNodeView node={split.children[0]} showClose={showClose} />
       </div>
 
       {/* Resize handle */}
@@ -111,13 +136,8 @@ function PaneSplitView({ split }: { split: PaneSplit }) {
         `}
       />
 
-      <div
-        style={{
-          flex: 1,
-          overflow: "hidden",
-        }}
-      >
-        <PaneNodeView node={split.children[1]} />
+      <div style={{ flex: 1, overflow: "hidden" }}>
+        <PaneNodeView node={split.children[1]} showClose={showClose} />
       </div>
     </div>
   );
